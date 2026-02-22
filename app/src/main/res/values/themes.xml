@@ -1,0 +1,9 @@
+<resources>
+    <!-- Base application theme — Compose handles most styling; this prevents a white flash on launch. -->
+    <style name="Theme.TrackApp" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0F0F11</item>
+        <item name="android:statusBarColor">#0F0F11</item>
+        <item name="android:navigationBarColor">#0F0F11</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

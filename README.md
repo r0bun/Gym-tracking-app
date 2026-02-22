@@ -1,0 +1,150 @@
+# TrackApp — Workout Tracker
+
+A native Android workout tracking app built with **Kotlin + Jetpack Compose**, **Room (SQLite)**, and **Supabase**.
+
+### Features
+- **Account auth** — email/sign-up via Supabase with persistent session ("Keep me signed in")
+- **Per-set logging** — each exercise entry has individual sets with reps, weight, and optional to-failure flag
+- **kg / lbs toggle** — per-exercise unit preference, remembered across sessions
+- **Superset linking** — link two exercises together with a shared superset label
+- **Exercise search** — search and filter cloud-synced exercise list by muscle group
+- **History** — browse and delete past workouts with confirmation dialog
+- **Offline-first** — all workout data stored locally in Room; exercises cached from Supabase on login
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| UI | Kotlin + Jetpack Compose + Material 3 |
+| Local DB | Room (SQLite) |
+| Backend / Auth | Supabase (PostgreSQL + Auth) |
+| HTTP | Ktor Android client |
+| Navigation | Navigation Compose |
+
+---
+
+## Project Setup
+
+### 1. Open in Android Studio
+Open the `TrackApp` folder in **Android Studio Ladybug** (2024.x) or newer.
+
+### 2. Create a Supabase Project
+1. Go to [supabase.com](https://supabase.com) and create a free project.
+2. In the **SQL Editor**, run the following to create the exercises table:
+
+```sql
+create table exercises (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  muscle_group text not null
+);
+
+-- Seed some exercises
+insert into exercises (name, muscle_group) values
+  ('Bench Press', 'Chest'),
+  ('Incline Dumbbell Press', 'Chest'),
+  ('Squat', 'Legs'),
+  ('Leg Press', 'Legs'),
+  ('Romanian Deadlift', 'Legs'),
+  ('Deadlift', 'Back'),
+  ('Pull-Up', 'Back'),
+  ('Barbell Row', 'Back'),
+  ('Lat Pulldown', 'Back'),
+  ('Overhead Press', 'Shoulders'),
+  ('Lateral Raise', 'Shoulders'),
+  ('Dumbbell Curl', 'Biceps'),
+  ('Hammer Curl', 'Biceps'),
+  ('Tricep Pushdown', 'Triceps'),
+  ('Skull Crusher', 'Triceps'),
+  ('Plank', 'Core'),
+  ('Cable Crunch', 'Core');
+```
+
+3. In the Supabase dashboard go to **Settings → API** and copy:
+   - **Project URL**
+   - **anon public** key
+
+### 3. Add Your Supabase Credentials
+Open `app/src/main/java/com/trackapp/data/remote/SupabaseConfig.kt` and replace the placeholders:
+
+```kotlin
+private const val SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co"
+private const val SUPABASE_ANON_KEY = "YOUR_ANON_KEY"
+```
+
+### 4. Build & Run
+Click **Run** in Android Studio (or `Shift+F10`). Target an emulator or physical device running **Android 12+**.
+
+---
+
+## App Flow
+
+```
+Launch → Loading screen (resolves persisted Supabase session)
+           ↓
+       Already signed in?  ──yes──▶  Home Screen
+           ↓ no
+       Login / Sign Up  ("Keep me signed in" checkbox)
+           ↓
+       Sync exercises from Supabase → cached in Room SQLite
+           ↓
+       Home Screen → Start Workout (named session, stored locally)
+           ↓
+       Workout Screen → Pick exercises → log per-set reps/weight/to-failure
+                        kg ↔ lbs toggle per exercise
+                        Optional superset linking
+           ↓
+       History Screen → Browse / delete past workouts
+```
+
+---
+
+## Database Schema (Local Room — v3)
+
+```
+exercises       : id | name | muscle_group
+                  ← synced from Supabase on login, cached locally
+
+workouts        : id | date | notes
+                  ← stored locally only
+
+workout_entries : id | workout_id | exercise_id | notes | useLbs | superset_id
+                  ← one row per exercise logged in a workout
+
+sets            : id | entry_id | set_number | reps | weight_kg | to_failure
+                  ← one row per individual set within an entry
+```
+
+---
+
+## Folder Structure
+
+```
+app/src/main/java/com/trackapp/
+├── data/
+│   ├── local/
+│   │   ├── AppDatabase.kt            ← Room DB, version 3
+│   │   ├── dao/                      ← ExerciseDao, WorkoutDao, WorkoutEntryDao, SetDao
+│   │   └── entity/                   ← ExerciseEntity, WorkoutEntity, WorkoutEntryEntity, SetEntity
+│   ├── remote/
+│   │   ├── SupabaseConfig.kt         ← Supabase client (initialized in Application.onCreate)
+│   │   ├── SharedPreferencesSessionManager.kt  ← persists JWT session across restarts
+│   │   └── RemoteExercise.kt
+│   └── repository/
+│       ├── AuthRepository.kt         ← auth + reactive isSignedInFlow
+│       ├── ExerciseRepository.kt
+│       ├── WorkoutRepository.kt
+│       └── PreferencesRepository.kt  ← kg/lbs default, keep-signed-in flag
+├── ui/
+│   ├── navigation/                   ← Screen.kt, AppNavigation.kt (loading → login/home)
+│   ├── screens/
+│   │   ├── auth/                     ← LoginScreen, LoginViewModel
+│   │   ├── home/                     ← HomeScreen, HomeViewModel
+│   │   ├── workout/                  ← WorkoutScreen, WorkoutViewModel
+│   │   └── history/                  ← HistoryScreen, HistoryViewModel
+│   └── theme/                        ← Color.kt, Theme.kt, Type.kt
+├── MainActivity.kt
+└── TrackApplication.kt
+```
