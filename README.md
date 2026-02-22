@@ -25,59 +25,7 @@ A native Android workout tracking app built with **Kotlin + Jetpack Compose**, *
 
 ---
 
-## Project Setup
 
-### 1. Open in Android Studio
-Open the `TrackApp` folder in **Android Studio Ladybug** (2024.x) or newer.
-
-### 2. Create a Supabase Project
-1. Go to [supabase.com](https://supabase.com) and create a free project.
-2. In the **SQL Editor**, run the following to create the exercises table:
-
-```sql
-create table exercises (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  muscle_group text not null
-);
-
--- Seed some exercises
-insert into exercises (name, muscle_group) values
-  ('Bench Press', 'Chest'),
-  ('Incline Dumbbell Press', 'Chest'),
-  ('Squat', 'Legs'),
-  ('Leg Press', 'Legs'),
-  ('Romanian Deadlift', 'Legs'),
-  ('Deadlift', 'Back'),
-  ('Pull-Up', 'Back'),
-  ('Barbell Row', 'Back'),
-  ('Lat Pulldown', 'Back'),
-  ('Overhead Press', 'Shoulders'),
-  ('Lateral Raise', 'Shoulders'),
-  ('Dumbbell Curl', 'Biceps'),
-  ('Hammer Curl', 'Biceps'),
-  ('Tricep Pushdown', 'Triceps'),
-  ('Skull Crusher', 'Triceps'),
-  ('Plank', 'Core'),
-  ('Cable Crunch', 'Core');
-```
-
-3. In the Supabase dashboard go to **Settings → API** and copy:
-   - **Project URL**
-   - **anon public** key
-
-### 3. Add Your Supabase Credentials
-Open `app/src/main/java/com/trackapp/data/remote/SupabaseConfig.kt` and replace the placeholders:
-
-```kotlin
-private const val SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co"
-private const val SUPABASE_ANON_KEY = "YOUR_ANON_KEY"
-```
-
-### 4. Build & Run
-Click **Run** in Android Studio (or `Shift+F10`). Target an emulator or physical device running **Android 12+**.
-
----
 
 ## App Flow
 
