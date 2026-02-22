@@ -2,6 +2,8 @@
 
 A native Android workout tracking app built with **Kotlin + Jetpack Compose**, **Room (SQLite)**, and **Supabase**.
 
+**[Download the latest APK here!](https://github.com/r0bun/Gym-tracking-app/releases/tag/v1.0.0)**
+
 ### Features
 - **Account auth** — email/sign-up via Supabase with persistent session ("Keep me signed in")
 - **Per-set logging** — each exercise entry has individual sets with reps, weight, and optional to-failure flag
