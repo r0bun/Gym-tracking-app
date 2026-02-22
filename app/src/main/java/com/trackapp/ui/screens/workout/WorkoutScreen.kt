@@ -46,8 +46,36 @@ fun WorkoutScreen(
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var renameText by remember { mutableStateOf("") }
 
     LaunchedEffect(workoutId) { viewModel.loadWorkout(workoutId) }
+
+    // Rename workout dialog
+    if (uiState.showRenameDialog) {
+        LaunchedEffect(Unit) { renameText = uiState.workoutName.let { if (it == "Workout") "" else it } }
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRenameDialog,
+            title = { Text("Rename Workout") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    placeholder = { Text("e.g. Push Day, Leg Day…") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateWorkoutName(renameText)
+                    renameText = ""
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissRenameDialog(); renameText = "" }) { Text("Cancel") }
+            }
+        )
+    }
 
     // Exercise picker bottom sheet
     if (uiState.showExercisePicker) {
@@ -91,7 +119,22 @@ fun WorkoutScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(uiState.workoutName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { viewModel.showRenameDialog() }
+                    ) {
+                        Text(uiState.workoutName, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false))
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = "Rename workout",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")

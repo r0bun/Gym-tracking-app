@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.trackapp.data.local.entity.WorkoutEntity
 import com.trackapp.data.repository.AuthRepository
+import com.trackapp.data.repository.ExerciseRepository
 import com.trackapp.data.repository.WorkoutRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,12 +15,15 @@ import java.util.*
 data class HomeUiState(
     val recentWorkouts: List<WorkoutEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val userEmail: String = ""
+    val userEmail: String = "",
+    val isSyncingExercises: Boolean = false,
+    val syncMessage: String? = null
 )
 
 class HomeViewModel(
     private val workoutRepository: WorkoutRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val exerciseRepository: ExerciseRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -53,14 +57,37 @@ class HomeViewModel(
         return sdf.format(Date(timestamp))
     }
 
+    fun syncExercises() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSyncingExercises = true, syncMessage = null)
+            try {
+                exerciseRepository.syncFromRemote()
+                _uiState.value = _uiState.value.copy(
+                    isSyncingExercises = false,
+                    syncMessage = "Exercises synced successfully"
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSyncingExercises = false,
+                    syncMessage = "Sync failed: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun clearSyncMessage() {
+        _uiState.value = _uiState.value.copy(syncMessage = null)
+    }
+
     suspend fun signOut() = authRepository.signOut()
 
     class Factory(
         private val workoutRepository: WorkoutRepository,
-        private val authRepository: AuthRepository
+        private val authRepository: AuthRepository,
+        private val exerciseRepository: ExerciseRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            HomeViewModel(workoutRepository, authRepository) as T
+            HomeViewModel(workoutRepository, authRepository, exerciseRepository) as T
     }
 }

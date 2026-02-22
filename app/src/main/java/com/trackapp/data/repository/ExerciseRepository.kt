@@ -37,7 +37,6 @@ class ExerciseRepository(private val exerciseDao: ExerciseDao) {
                 muscleGroup = remote.muscleGroup
             )
         }
-        exerciseDao.clearAll()
         exerciseDao.upsertAll(entities)
     }
 }

@@ -50,7 +50,8 @@ data class WorkoutUiState(
     val editingEntryId: String? = null,
     val isSaving: Boolean = false,
     val error: String? = null,
-    val showSupersetPickerForEntryId: String? = null
+    val showSupersetPickerForEntryId: String? = null,
+    val showRenameDialog: Boolean = false
 )
 
 class WorkoutViewModel(
@@ -275,6 +276,27 @@ class WorkoutViewModel(
 
     fun unlinkSuperset(entry: WorkoutEntryEntity) {
         viewModelScope.launch { workoutRepository.updateEntry(entry.copy(supersetGroupId = null)) }
+    }
+
+    // ── Rename workout ────────────────────────────────────────────────────
+
+    fun showRenameDialog() {
+        _uiState.value = _uiState.value.copy(showRenameDialog = true)
+    }
+
+    fun dismissRenameDialog() {
+        _uiState.value = _uiState.value.copy(showRenameDialog = false)
+    }
+
+    fun updateWorkoutName(newName: String) {
+        viewModelScope.launch {
+            val workout = workoutRepository.getWorkoutById(_uiState.value.workoutId) ?: return@launch
+            workoutRepository.updateWorkoutNotes(workout, newName)
+            _uiState.value = _uiState.value.copy(
+                workoutName = newName.ifBlank { "Workout" },
+                showRenameDialog = false
+            )
+        }
     }
 
     fun clearError() {

@@ -91,7 +91,7 @@ fun AppNavigation(
         // â”€â”€ Home â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         composable(Screen.Home.route) {
             val vm: HomeViewModel = viewModel(
-                factory = HomeViewModel.Factory(workoutRepository, authRepository)
+                factory = HomeViewModel.Factory(workoutRepository, authRepository, exerciseRepository)
             )
             HomeScreen(
                 viewModel = vm,

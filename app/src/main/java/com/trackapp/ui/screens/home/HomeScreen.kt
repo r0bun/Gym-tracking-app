@@ -26,9 +26,18 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
     var pendingWorkoutName by remember { mutableStateOf("") }
+
+    // Show sync result as a Snackbar
+    uiState.syncMessage?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearSyncMessage()
+        }
+    }
 
     if (showNameDialog) {
         AlertDialog(
@@ -79,6 +88,7 @@ fun HomeScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -96,6 +106,20 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.syncExercises() },
+                        enabled = !uiState.isSyncingExercises
+                    ) {
+                        if (uiState.isSyncingExercises) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Sync Exercises")
+                        }
+                    }
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Filled.History, contentDescription = "History")
                     }
