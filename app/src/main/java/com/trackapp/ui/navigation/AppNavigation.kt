@@ -1,4 +1,11 @@
-﻿package com.trackapp.ui.navigation
+// This file is the "router" for the entire app — it defines which composable
+// (screen) is shown for each route, and handles automatic navigation based on
+// whether the user is signed in or not.
+//
+// Think of it like a traffic controller: it decides where to send the user
+// based on their current auth state (null/true/false).
+
+package com.trackapp.ui.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +36,8 @@ import com.trackapp.ui.screens.home.HomeViewModel
 import com.trackapp.ui.screens.workout.WorkoutScreen
 import com.trackapp.ui.screens.workout.WorkoutViewModel
 
+// This is the top-level composable called from MainActivity.
+// The repositories are passed in so every screen can access data.
 @Composable
 fun AppNavigation(
     authRepository: AuthRepository,
@@ -36,19 +45,25 @@ fun AppNavigation(
     workoutRepository: WorkoutRepository,
     preferencesRepository: PreferencesRepository
 ) {
+    // navController manages the navigation back-stack (the history of screens
+    // the user has visited, like browser history). Pressing Back pops the stack.
     val navController = rememberNavController()
 
-    // Observe session status:
-    //   null  → still loading from storage (show spinner)
-    //   true  → authenticated            (go to Home)
-    //   false → not authenticated        (go to Login)
+    // Observe the sign-in state as a Compose State — every time isSignedIn
+    // changes, the LaunchedEffect below re-runs.
     val isSignedIn by authRepository.isSignedInFlow.collectAsState()
 
+    // LaunchedEffect runs a coroutine whenever its key (isSignedIn) changes.
+    // This is where automatic navigation happens:
+    //   null  → do nothing (still loading, show the spinner on "loading" route)
+    //   true  → go to Home, clear the back-stack (can't go back to login)
+    //   false → go to Login, clear the back-stack (can't go back to home)
     LaunchedEffect(isSignedIn) {
         val currentRoute = navController.currentDestination?.route
         when (isSignedIn) {
             true -> if (currentRoute != Screen.Home.route) {
                 navController.navigate(Screen.Home.route) {
+                    // popUpTo(0) clears every previous destination from the stack.
                     popUpTo(0) { inclusive = true }
                 }
             }
@@ -61,11 +76,15 @@ fun AppNavigation(
         }
     }
 
-    // Start on a neutral loading screen so neither Login nor Home flashes
-    // before the persisted session is resolved.
+    // NavHost is the container that swaps screens in and out.
+    // startDestination = the first screen shown when the app opens.
+    // We start on "loading" (a spinner) so neither Login nor Home flashes
+    // briefly before the stored session is resolved.
     NavHost(navController = navController, startDestination = "loading") {
 
-        // ── Loading ─────────────────────────────────────────────────────────
+        // ── Loading screen ───────────────────────────────────────────────────
+        // Shows a spinning indicator while the app checks if the user is
+        // already logged in from a previous session.
         composable("loading") {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -75,26 +94,31 @@ fun AppNavigation(
             }
         }
 
-        // â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Login screen ─────────────────────────────────────────────────────
+        // viewModel(factory = ...) creates the ViewModel with its dependencies.
+        // The Factory pattern is needed because ViewModels can't take arbitrary
+        // constructor parameters — we must tell Compose how to build them.
         composable(Screen.Login.route) {
             val vm: LoginViewModel = viewModel(
                 factory = LoginViewModel.Factory(authRepository, exerciseRepository, preferencesRepository)
             )
             LoginScreen(
                 viewModel = vm,
-                // Navigation to Home is driven by the isSignedIn LaunchedEffect above,
-                // so this callback is intentionally a no-op.
+                // Navigation to Home is driven by the isSignedIn LaunchedEffect
+                // above, so this callback doesn't need to do anything.
                 onAuthSuccess = { }
             )
         }
 
-        // â”€â”€ Home â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Home screen ──────────────────────────────────────────────────────
         composable(Screen.Home.route) {
             val vm: HomeViewModel = viewModel(
                 factory = HomeViewModel.Factory(workoutRepository, authRepository, exerciseRepository)
             )
             HomeScreen(
                 viewModel = vm,
+                // Navigate to the Workout screen when the user taps "Start Workout"
+                // or taps a recent workout card.
                 onStartWorkout = { workoutId ->
                     navController.navigate(Screen.Workout.createRoute(workoutId))
                 },
@@ -102,6 +126,7 @@ fun AppNavigation(
                     navController.navigate(Screen.Workout.createRoute(workoutId))
                 },
                 onSignOut = {
+                    // Go back to Login and clear the entire back-stack.
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -112,11 +137,14 @@ fun AppNavigation(
             )
         }
 
-        // â”€â”€ Workout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Workout screen ───────────────────────────────────────────────────
         composable(
             route = Screen.Workout.route,
+            // Declare that this route accepts a "workoutId" path argument
+            // of type String (e.g. "workout/abc-123" → workoutId = "abc-123").
             arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
         ) { backStackEntry ->
+            // Extract the workoutId from the URL path.
             val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
             val vm: WorkoutViewModel = viewModel(
                 factory = WorkoutViewModel.Factory(workoutRepository, exerciseRepository, preferencesRepository)
@@ -124,11 +152,12 @@ fun AppNavigation(
             WorkoutScreen(
                 viewModel = vm,
                 workoutId = workoutId,
+                // popBackStack() goes back to the previous screen (Home or History).
                 onBack = { navController.popBackStack() }
             )
         }
 
-        // â”€â”€ History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── History screen ───────────────────────────────────────────────────
         composable(Screen.History.route) {
             val vm: HistoryViewModel = viewModel(
                 factory = HistoryViewModel.Factory(workoutRepository)

@@ -1,3 +1,8 @@
+// This file defines the visual layout of the Login / Sign-Up screen.
+// The screen has two modes (toggled by the user):
+//   - Sign In: email + password + "Keep me signed in" checkbox
+//   - Sign Up: email + password (no keep-signed-in option)
+
 package com.trackapp.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
@@ -24,40 +29,54 @@ import com.trackapp.ui.theme.Accent
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
-    onAuthSuccess: () -> Unit
+    onAuthSuccess: () -> Unit  // called when login/signup succeeds (navigation callback)
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // LocalFocusManager lets us move the keyboard focus between fields
+    // (e.g. pressing "Next" on the email field jumps to the password field).
     val focusManager = LocalFocusManager.current
+
+    // remember {} keeps this value alive across recompositions.
+    // mutableStateOf creates a Compose state variable — changing it triggers a redraw.
     var passwordVisible by remember { mutableStateOf(false) }
 
+    // LaunchedEffect runs when isSuccess becomes true (after successful login).
+    // It calls onAuthSuccess(), which AppNavigation ignores (navigation is driven
+    // by the isSignedIn flow in AuthRepository instead).
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) onAuthSuccess()
     }
 
+    // Box centers all its children horizontally and vertically.
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Column stacks children vertically with 16.dp gaps between them.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Logo
+            // App logo icon (dumbbell).
             Icon(
                 imageVector = Icons.Filled.FitnessCenter,
-                contentDescription = null,
+                contentDescription = null,   // null = decorative, ignored by accessibility
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(72.dp)
             )
 
+            // App name heading.
             Text(
                 text = "TrackApp",
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
+
+            // Sub-heading changes based on mode.
             Text(
                 text = if (uiState.isSignUp) "Create your account" else "Welcome back",
                 style = MaterialTheme.typography.bodyMedium,
@@ -67,41 +86,46 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Email field
+            // ── Email field ──────────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.email,
-                onValueChange = viewModel::onEmailChange,
+                onValueChange = viewModel::onEmailChange,  // update ViewModel on every keystroke
                 label = { Text("Email") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
+                    keyboardType = KeyboardType.Email,   // shows @ on keyboard
+                    imeAction = ImeAction.Next           // shows "Next" button on keyboard
                 ),
                 keyboardActions = KeyboardActions(
+                    // Pressing "Next" moves focus to the password field below.
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 )
             )
 
-            // Password field
+            // ── Password field ───────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.password,
                 onValueChange = viewModel::onPasswordChange,
                 label = { Text("Password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                // PasswordVisualTransformation shows dots instead of characters.
+                // VisualTransformation.None shows the actual characters.
                 visualTransformation = if (passwordVisible) VisualTransformation.None
                                        else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
+                    imeAction = ImeAction.Done  // shows "Done" / checkmark on keyboard
                 ),
                 keyboardActions = KeyboardActions(
+                    // Pressing "Done" hides the keyboard and submits the form.
                     onDone = {
                         focusManager.clearFocus()
                         viewModel.submit()
                     }
                 ),
+                // Eye icon in the right side of the field — toggles password visibility.
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -113,7 +137,8 @@ fun LoginScreen(
                 }
             )
 
-            // Error message
+            // ── Error banner ─────────────────────────────────────────────────
+            // Only rendered when there is an error message to show.
             if (uiState.error != null) {
                 Card(
                     colors = CardDefaults.cardColors(
@@ -122,7 +147,7 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = uiState.error!!,
+                        text = uiState.error!!,  // !! asserts non-null (safe here because of the if above)
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall
@@ -130,7 +155,7 @@ fun LoginScreen(
                 }
             }
 
-            // Submit button
+            // ── "Keep me signed in" row (Sign In mode only) ──────────────────
             if (!uiState.isSignUp) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -149,7 +174,9 @@ fun LoginScreen(
                 }
             }
 
-            // Submit button
+            // ── Submit button ────────────────────────────────────────────────
+            // Disabled while the network request is in progress to prevent
+            // the user from tapping it twice.
             Button(
                 onClick = viewModel::submit,
                 enabled = !uiState.isLoading,
@@ -158,6 +185,7 @@ fun LoginScreen(
                     .height(52.dp)
             ) {
                 if (uiState.isLoading) {
+                    // Show a small spinner inside the button while loading.
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
@@ -171,7 +199,8 @@ fun LoginScreen(
                 }
             }
 
-            // Toggle sign in / sign up
+            // ── Toggle Sign In / Sign Up ─────────────────────────────────────
+            // A text link at the bottom that switches between the two modes.
             TextButton(onClick = viewModel::toggleMode) {
                 Text(
                     text = if (uiState.isSignUp) "Already have an account? Sign In"

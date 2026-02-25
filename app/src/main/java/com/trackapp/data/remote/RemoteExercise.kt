@@ -1,34 +1,29 @@
+// This file defines what an exercise looks like when it comes from the cloud
+// (Supabase). It is a "DTO" — Data Transfer Object — a plain data class whose
+// only job is to carry data received from the network.
+//
+// The exercise list lives in a PostgreSQL table on Supabase. When the app
+// downloads it, the JSON looks like:
+//   { "id": "abc123", "name": "Bench Press", "muscle_group": "Chest" }
+// This class tells Kotlin how to turn that JSON into a usable object.
+
 package com.trackapp.data.remote
 
+// @Serializable lets the kotlinx.serialization library convert JSON ↔ Kotlin
+// objects automatically (a process called serialization/deserialization).
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Remote DTO matching the `exercises` table in Supabase PostgreSQL.
- *
- * SQL to create the table in Supabase SQL editor:
- *   create table exercises (
- *     id uuid primary key default gen_random_uuid(),
- *     name text not null,
- *     muscle_group text not null
- *   );
- *
- * Seed data examples:
- *   insert into exercises (name, muscle_group) values
- *     ('Bench Press', 'Chest'),
- *     ('Squat', 'Legs'),
- *     ('Deadlift', 'Back'),
- *     ('Overhead Press', 'Shoulders'),
- *     ('Pull-Up', 'Back'),
- *     ('Barbell Row', 'Back'),
- *     ('Dumbbell Curl', 'Biceps'),
- *     ('Tricep Pushdown', 'Triceps'),
- *     ('Leg Press', 'Legs'),
- *     ('Plank', 'Core');
- */
 @Serializable
 data class RemoteExercise(
     val id: String,
+
     val name: String,
+
+    // The JSON field is named "muscle_group" (snake_case, the SQL convention),
+    // but in Kotlin we prefer camelCase. @SerialName maps one to the other.
     @SerialName("muscle_group") val muscleGroup: String
 )
+
+// After downloading, each RemoteExercise is converted to an ExerciseEntity
+// and saved to the local Room database (see ExerciseRepository.syncFromRemote).

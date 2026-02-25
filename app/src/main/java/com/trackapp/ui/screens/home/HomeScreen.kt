@@ -1,3 +1,10 @@
+// This file defines the visual layout of the Home screen.
+// The Home screen is the main landing page after login. It shows:
+//   - A top bar with the user's email, a sync button, history, and sign-out
+//   - A hero card ("Ready to train?")
+//   - A list of recent workouts (up to 5)
+//   - A "Start Workout" floating action button (FAB)
+
 package com.trackapp.ui.screens.home
 
 import androidx.compose.foundation.clickable
@@ -19,26 +26,36 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onStartWorkout: (String) -> Unit,
-    onOpenWorkout: (String) -> Unit,
-    onSignOut: () -> Unit,
-    onOpenHistory: () -> Unit
+    onStartWorkout: (String) -> Unit,  // navigate to a new workout
+    onOpenWorkout: (String) -> Unit,   // navigate to an existing workout
+    onSignOut: () -> Unit,             // navigate back to Login
+    onOpenHistory: () -> Unit          // navigate to the History screen
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // rememberCoroutineScope() gives us a scope for launching coroutines from
+    // within a composable (e.g. from a button click handler).
     val scope = rememberCoroutineScope()
+
+    // SnackbarHostState manages the snackbar queue (the toast-like message at
+    // the bottom of the screen after a sync).
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Local UI state for dialog visibility and the new workout name input.
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
     var pendingWorkoutName by remember { mutableStateOf("") }
 
-    // Show sync result as a Snackbar
+    // Show the sync result as a snackbar whenever the syncMessage changes.
+    // LaunchedEffect re-runs whenever "message" changes.
     uiState.syncMessage?.let { message ->
         LaunchedEffect(message) {
             snackbarHostState.showSnackbar(message)
-            viewModel.clearSyncMessage()
+            viewModel.clearSyncMessage()  // clear so the snackbar doesn't re-show
         }
     }
 
+    // ── Name dialog — shown when the user taps "Start Workout" ───────────────
     if (showNameDialog) {
         AlertDialog(
             onDismissRequest = { showNameDialog = false; pendingWorkoutName = "" },
@@ -55,6 +72,7 @@ fun HomeScreen(
             confirmButton = {
                 Button(onClick = {
                     showNameDialog = false
+                    // Create the workout in the DB and navigate to it.
                     viewModel.startNewWorkout(pendingWorkoutName, onStartWorkout)
                     pendingWorkoutName = ""
                 }) { Text("Start") }
@@ -65,6 +83,7 @@ fun HomeScreen(
         )
     }
 
+    // ── Sign out confirmation dialog ──────────────────────────────────────────
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
@@ -74,9 +93,10 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         showSignOutDialog = false
+                        // Sign out is a suspend function, so we launch a coroutine.
                         scope.launch {
                             viewModel.signOut()
-                            onSignOut()
+                            onSignOut()  // navigate back to Login
                         }
                     }
                 ) { Text("Sign Out", color = MaterialTheme.colorScheme.error) }
@@ -87,13 +107,15 @@ fun HomeScreen(
         )
     }
 
+    // ── Main scaffold ─────────────────────────────────────────────────────────
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) }, // renders snackbars
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text("TrackApp", style = MaterialTheme.typography.titleLarge)
+                        // Show the user's email below the app name (if available).
                         if (uiState.userEmail.isNotBlank()) {
                             Text(
                                 text = uiState.userEmail,
@@ -106,6 +128,7 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // Sync exercises button — shows a spinner while syncing.
                     IconButton(
                         onClick = { viewModel.syncExercises() },
                         enabled = !uiState.isSyncingExercises
@@ -120,9 +143,11 @@ fun HomeScreen(
                             Icon(Icons.Filled.Refresh, contentDescription = "Sync Exercises")
                         }
                     }
+                    // History screen button.
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Filled.History, contentDescription = "History")
                     }
+                    // Sign out button.
                     IconButton(onClick = { showSignOutDialog = true }) {
                         Icon(Icons.Filled.Logout, contentDescription = "Sign Out")
                     }
@@ -132,6 +157,8 @@ fun HomeScreen(
                 )
             )
         },
+        // Floating Action Button — the prominent "Start Workout" button.
+        // It floats above the list so it's always accessible.
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 text = { Text("Start Workout") },
@@ -141,6 +168,8 @@ fun HomeScreen(
             )
         }
     ) { padding ->
+
+        // ── Loading state ─────────────────────────────────────────────────────
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier
@@ -159,7 +188,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                // Hero card
+                // ── Hero card — always shown at the top ───────────────────────
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -189,7 +218,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Recent section header
+                // ── Recent workouts section ───────────────────────────────────
                 if (uiState.recentWorkouts.isNotEmpty()) {
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -200,6 +229,7 @@ fun HomeScreen(
                         )
                     }
 
+                    // One card per recent workout.
                     items(uiState.recentWorkouts, key = { it.id }) { workout ->
                         Card(
                             modifier = Modifier
@@ -223,13 +253,16 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
+                                    // Show name if set, otherwise fall back to the date.
                                     Text(
-                                        text = if (workout.notes.isNotBlank()) workout.notes else viewModel.formatDate(workout.date),
+                                        text = if (workout.notes.isNotBlank()) workout.notes
+                                               else viewModel.formatDate(workout.date),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    // If named, show the date as secondary info.
                                     if (workout.notes.isNotBlank()) {
                                         Text(
                                             text = viewModel.formatDate(workout.date),
@@ -240,6 +273,7 @@ fun HomeScreen(
                                         )
                                     }
                                 }
+                                // Chevron ">" indicating the card is tappable.
                                 Icon(
                                     imageVector = Icons.Filled.ChevronRight,
                                     contentDescription = null,
@@ -249,6 +283,7 @@ fun HomeScreen(
                         }
                     }
                 } else {
+                    // Empty state — shown until the user starts their first workout.
                     item {
                         Box(
                             modifier = Modifier
@@ -266,7 +301,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Space for FAB
+                // Extra space at the bottom so the FAB doesn't overlap the last card.
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
