@@ -11,6 +11,8 @@ import android.content.Context
 //   - StateFlow: read-only view exposed to the outside world
 // Any part of the UI that "collects" (observes) a StateFlow will automatically
 // recompose (redraw) whenever the value changes.
+import com.trackapp.ui.theme.DEFAULT_ACCENT_HEX
+import com.trackapp.ui.theme.isValidHex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,5 +53,25 @@ class PreferencesRepository(context: Context) {
     fun setKeepSignedIn(value: Boolean) {
         prefs.edit().putBoolean("keep_signed_in", value).apply()
         _keepSignedIn.value = value
+    }
+
+    // ── Accent color preference ──────────────────────────────────────────
+    // Stores the user's chosen primary/accent color as a 6-char hex string
+    // (e.g. "8B5CF6" for violet). This drives the entire app's primary color.
+    //
+    // We store the raw hex rather than an enum name so the user can pick ANY
+    // color — not just the presets. DEFAULT_ACCENT_HEX is the original indigo.
+
+    private val _accentColorHex = MutableStateFlow(
+        prefs.getString("accent_color", DEFAULT_ACCENT_HEX) ?: DEFAULT_ACCENT_HEX
+    )
+    val accentColorHex: StateFlow<String> = _accentColorHex.asStateFlow()
+
+    // Saves a new accent color. Only accepts valid 6-char hex strings —
+    // silently ignores invalid input so the app never stores garbage.
+    fun setAccentColorHex(hex: String) {
+        if (!isValidHex(hex)) return  // reject invalid hex codes
+        prefs.edit().putString("accent_color", hex).apply()
+        _accentColorHex.value = hex
     }
 }

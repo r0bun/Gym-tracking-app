@@ -33,6 +33,8 @@ import com.trackapp.ui.screens.history.HistoryScreen
 import com.trackapp.ui.screens.history.HistoryViewModel
 import com.trackapp.ui.screens.home.HomeScreen
 import com.trackapp.ui.screens.home.HomeViewModel
+import com.trackapp.ui.screens.settings.SettingsScreen
+import com.trackapp.ui.screens.settings.SettingsViewModel
 import com.trackapp.ui.screens.workout.WorkoutScreen
 import com.trackapp.ui.screens.workout.WorkoutViewModel
 
@@ -133,6 +135,9 @@ fun AppNavigation(
                 },
                 onOpenHistory = {
                     navController.navigate(Screen.History.route)
+                },
+                onOpenSettings = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -167,6 +172,18 @@ fun AppNavigation(
                 onOpenWorkout = { workoutId ->
                     navController.navigate(Screen.Workout.createRoute(workoutId))
                 },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Settings screen ────────────────────────────────────────────────
+        // Lets the user change the app's accent color (presets or custom hex).
+        composable(Screen.Settings.route) {
+            val vm: SettingsViewModel = viewModel(
+                factory = SettingsViewModel.Factory(preferencesRepository)
+            )
+            SettingsScreen(
+                viewModel = vm,
                 onBack = { navController.popBackStack() }
             )
         }

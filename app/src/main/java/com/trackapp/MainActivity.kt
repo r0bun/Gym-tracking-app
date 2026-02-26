@@ -14,8 +14,12 @@ import androidx.activity.compose.setContent
 // enableEdgeToEdge makes the app draw behind the status bar and navigation bar
 // for a more immersive, modern look.
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.trackapp.ui.navigation.AppNavigation
 import com.trackapp.ui.theme.TrackAppTheme
+import com.trackapp.ui.theme.darkenColor
+import com.trackapp.ui.theme.hexToColor
 
 class MainActivity : ComponentActivity() {
 
@@ -36,9 +40,28 @@ class MainActivity : ComponentActivity() {
         // setContent replaces the traditional XML layout with a Compose UI tree.
         // Everything inside this block is our app's UI.
         setContent {
-            // Wrap everything in our custom dark theme so colors and typography
-            // are applied globally to all screens.
-            TrackAppTheme {
+            // ── Dynamic accent color ────────────────────────────────────────
+            // Read the user's chosen hex color from preferences. collectAsState()
+            // converts the StateFlow into Compose state — when the user picks a
+            // new color in Settings, this triggers a recomposition and the entire
+            // theme updates instantly without restarting the app.
+            val accentHex by app.preferencesRepository.accentColorHex.collectAsState()
+
+            // Convert the hex string to a Compose Color object.
+            // hexToColor handles invalid values gracefully (falls back to default).
+            val primaryColor = hexToColor(accentHex)
+
+            // Auto-derive a darker shade for pressed states and primaryContainer.
+            // 25% darker keeps it visually related but distinct from the main color.
+            val primaryVariantColor = darkenColor(primaryColor, factor = 0.25f)
+
+            // Wrap everything in our custom dark theme with the dynamic primary color.
+            // Every Material 3 component (buttons, FABs, switches, etc.) automatically
+            // picks up the new primary color from MaterialTheme.colorScheme.primary.
+            TrackAppTheme(
+                primaryColor = primaryColor,
+                primaryVariantColor = primaryVariantColor
+            ) {
                 // AppNavigation is the root composable — it owns the nav controller
                 // and renders whichever screen the user is currently on.
                 AppNavigation(

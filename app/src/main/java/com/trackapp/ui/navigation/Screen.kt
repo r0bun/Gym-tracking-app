@@ -29,4 +29,8 @@ sealed class Screen(val route: String) {
 
     // The workout history screen. Route: "history"
     data object History : Screen("history")
+
+    // The settings screen for changing app preferences (theme color, etc.).
+    // Route: "settings"
+    data object Settings : Screen("settings")
 }

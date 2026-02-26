@@ -29,7 +29,8 @@ fun HomeScreen(
     onStartWorkout: (String) -> Unit,  // navigate to a new workout
     onOpenWorkout: (String) -> Unit,   // navigate to an existing workout
     onSignOut: () -> Unit,             // navigate back to Login
-    onOpenHistory: () -> Unit          // navigate to the History screen
+    onOpenHistory: () -> Unit,         // navigate to the History screen
+    onOpenSettings: () -> Unit         // navigate to the Settings screen (theme color, etc.)
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -146,6 +147,10 @@ fun HomeScreen(
                     // History screen button.
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Filled.History, contentDescription = "History")
+                    }
+                    // Settings button — opens the theme color picker and other preferences.
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                     // Sign out button.
                     IconButton(onClick = { showSignOutDialog = true }) {
