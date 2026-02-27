@@ -10,7 +10,10 @@ A native Android workout tracking app built with **Kotlin + Jetpack Compose**, *
 - **kg / lbs toggle** — per-exercise unit preference, remembered across sessions
 - **Superset linking** — link two exercises together with a shared superset label
 - **Exercise search** — search and filter cloud-synced exercise list by muscle group
+- **Workout rename** — tap the title to rename any workout session
 - **History** — browse and delete past workouts with confirmation dialog
+- **Theme customization** — pick from 8 preset accent colors or enter any custom hex code; app recolors instantly
+- **Compose previews** — every screen has @Preview composables for rapid UI iteration in Android Studio
 - **Offline-first** — all workout data stored locally in Room; exercises cached from Supabase on login
 
 ---
@@ -45,8 +48,11 @@ Launch → Loading screen (resolves persisted Supabase session)
        Workout Screen → Pick exercises → log per-set reps/weight/to-failure
                         kg ↔ lbs toggle per exercise
                         Optional superset linking
+                        Rename workout via tap on title
            ↓
        History Screen → Browse / delete past workouts
+           ↓
+       Settings Screen → Theme color picker (presets + custom hex)
 ```
 
 ---
@@ -77,7 +83,8 @@ app/src/main/java/com/trackapp/
 │   ├── local/
 │   │   ├── AppDatabase.kt            ← Room DB, version 3
 │   │   ├── dao/                      ← ExerciseDao, WorkoutDao, WorkoutEntryDao, SetDao
-│   │   └── entity/                   ← ExerciseEntity, WorkoutEntity, WorkoutEntryEntity, SetEntity
+│   │   └── entity/                   ← ExerciseEntity, WorkoutEntity, WorkoutEntryEntity,
+│   │                                    SetEntity, EntryWithSetsRelation
 │   ├── remote/
 │   │   ├── SupabaseConfig.kt         ← Supabase client (initialized in Application.onCreate)
 │   │   ├── SharedPreferencesSessionManager.kt  ← persists JWT session across restarts
@@ -86,15 +93,16 @@ app/src/main/java/com/trackapp/
 │       ├── AuthRepository.kt         ← auth + reactive isSignedInFlow
 │       ├── ExerciseRepository.kt
 │       ├── WorkoutRepository.kt
-│       └── PreferencesRepository.kt  ← kg/lbs default, keep-signed-in flag
+│       └── PreferencesRepository.kt  ← kg/lbs default, keep-signed-in, accent color
 ├── ui/
 │   ├── navigation/                   ← Screen.kt, AppNavigation.kt (loading → login/home)
 │   ├── screens/
 │   │   ├── auth/                     ← LoginScreen, LoginViewModel
 │   │   ├── home/                     ← HomeScreen, HomeViewModel
 │   │   ├── workout/                  ← WorkoutScreen, WorkoutViewModel
-│   │   └── history/                  ← HistoryScreen, HistoryViewModel
-│   └── theme/                        ← Color.kt, Theme.kt, Type.kt
+│   │   ├── history/                  ← HistoryScreen, HistoryViewModel
+│   │   └── settings/                 ← SettingsScreen, SettingsViewModel
+│   └── theme/                        ← Color.kt, Theme.kt, Type.kt, AccentColor.kt
 ├── MainActivity.kt
 └── TrackApplication.kt
 ```
