@@ -23,8 +23,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.trackapp.ui.theme.Accent
+import com.trackapp.ui.theme.TrackAppTheme
 
 @Composable
 fun LoginScreen(
@@ -33,6 +35,32 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // LaunchedEffect runs when isSuccess becomes true (after successful login).
+    // It calls onAuthSuccess(), which AppNavigation ignores (navigation is driven
+    // by the isSignedIn flow in AuthRepository instead).
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) onAuthSuccess()
+    }
+
+    LoginScreenContent(
+        uiState = uiState,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onSubmit = viewModel::submit,
+        onKeepSignedInChange = viewModel::onKeepSignedInChange,
+        onToggleMode = viewModel::toggleMode
+    )
+}
+
+@Composable
+fun LoginScreenContent(
+    uiState: AuthUiState,
+    onEmailChange: (String) -> Unit = {},
+    onPasswordChange: (String) -> Unit = {},
+    onSubmit: () -> Unit = {},
+    onKeepSignedInChange: (Boolean) -> Unit = {},
+    onToggleMode: () -> Unit = {}
+) {
     // LocalFocusManager lets us move the keyboard focus between fields
     // (e.g. pressing "Next" on the email field jumps to the password field).
     val focusManager = LocalFocusManager.current
@@ -40,13 +68,6 @@ fun LoginScreen(
     // remember {} keeps this value alive across recompositions.
     // mutableStateOf creates a Compose state variable — changing it triggers a redraw.
     var passwordVisible by remember { mutableStateOf(false) }
-
-    // LaunchedEffect runs when isSuccess becomes true (after successful login).
-    // It calls onAuthSuccess(), which AppNavigation ignores (navigation is driven
-    // by the isSignedIn flow in AuthRepository instead).
-    LaunchedEffect(uiState.isSuccess) {
-        if (uiState.isSuccess) onAuthSuccess()
-    }
 
     // Box centers all its children horizontally and vertically.
     Box(
@@ -89,7 +110,7 @@ fun LoginScreen(
             // ── Email field ──────────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.email,
-                onValueChange = viewModel::onEmailChange,  // update ViewModel on every keystroke
+                onValueChange = onEmailChange,  // update ViewModel on every keystroke
                 label = { Text("Email") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -106,7 +127,7 @@ fun LoginScreen(
             // ── Password field ───────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.password,
-                onValueChange = viewModel::onPasswordChange,
+                onValueChange = onPasswordChange,
                 label = { Text("Password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -122,7 +143,7 @@ fun LoginScreen(
                     // Pressing "Done" hides the keyboard and submits the form.
                     onDone = {
                         focusManager.clearFocus()
-                        viewModel.submit()
+                        onSubmit()
                     }
                 ),
                 // Eye icon in the right side of the field — toggles password visibility.
@@ -163,7 +184,7 @@ fun LoginScreen(
                 ) {
                     Checkbox(
                         checked = uiState.keepSignedIn,
-                        onCheckedChange = viewModel::onKeepSignedInChange
+                        onCheckedChange = onKeepSignedInChange
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -178,7 +199,7 @@ fun LoginScreen(
             // Disabled while the network request is in progress to prevent
             // the user from tapping it twice.
             Button(
-                onClick = viewModel::submit,
+                onClick = onSubmit,
                 enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -201,7 +222,7 @@ fun LoginScreen(
 
             // ── Toggle Sign In / Sign Up ─────────────────────────────────────
             // A text link at the bottom that switches between the two modes.
-            TextButton(onClick = viewModel::toggleMode) {
+            TextButton(onClick = onToggleMode) {
                 Text(
                     text = if (uiState.isSignUp) "Already have an account? Sign In"
                            else "Don't have an account? Sign Up",
@@ -209,5 +230,51 @@ fun LoginScreen(
                 )
             }
         }
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun LoginScreenPreview_SignIn() {
+    TrackAppTheme {
+        LoginScreenContent(uiState = AuthUiState())
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun LoginScreenPreview_SignUp() {
+    TrackAppTheme {
+        LoginScreenContent(uiState = AuthUiState(isSignUp = true))
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun LoginScreenPreview_Loading() {
+    TrackAppTheme {
+        LoginScreenContent(
+            uiState = AuthUiState(
+                email = "user@example.com",
+                password = "password",
+                isLoading = true
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun LoginScreenPreview_Error() {
+    TrackAppTheme {
+        LoginScreenContent(
+            uiState = AuthUiState(
+                email = "user@example.com",
+                password = "wrong",
+                error = "Invalid login credentials"
+            )
+        )
     }
 }

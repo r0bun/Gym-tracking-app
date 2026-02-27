@@ -29,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.trackapp.ui.theme.TrackAppTheme
 import com.trackapp.ui.theme.accentPresets
 import com.trackapp.ui.theme.hexToColor
 import com.trackapp.ui.theme.isValidHex
@@ -38,12 +40,24 @@ import com.trackapp.ui.theme.isValidHex
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onBack: () -> Unit   // called when the user presses the back arrow
+    onBack: () -> Unit
 ) {
-    // Observe the current accent color hex from the ViewModel.
-    // This updates live — if the color changes, the UI recomposes.
     val currentHex by viewModel.accentColorHex.collectAsState()
 
+    SettingsScreenContent(
+        currentHex = currentHex,
+        onBack = onBack,
+        onSetAccentColor = viewModel::setAccentColor
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreenContent(
+    currentHex: String = "4F46E5",
+    onBack: () -> Unit = {},
+    onSetAccentColor: (String) -> Unit = {}
+) {
     // Local state for the hex text input field.
     // Initialized to the saved color so the field shows the current value.
     var hexInput by remember(currentHex) { mutableStateOf(currentHex) }
@@ -68,6 +82,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
+                .padding(vertical = 16.dp)
         ) {
             // ── Section header ──────────────────────────────────────────
             Text(
@@ -119,7 +134,7 @@ fun SettingsScreen(
                                 .clickable {
                                     // Apply this preset: save to preferences and
                                     // update the text field to match.
-                                    viewModel.setAccentColor(preset.hex)
+                                    onSetAccentColor(preset.hex)
                                     hexInput = preset.hex
                                 },
                             contentAlignment = Alignment.Center
@@ -205,7 +220,7 @@ fun SettingsScreen(
                 // Apply button — saves the custom hex color.
                 // Disabled when the input isn't a valid 6-char hex code.
                 Button(
-                    onClick = { viewModel.setAccentColor(hexInput) },
+                    onClick = { onSetAccentColor(hexInput) },
                     enabled = isValidHex(hexInput),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -223,5 +238,23 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun SettingsScreenPreview_Default() {
+    TrackAppTheme {
+        SettingsScreenContent(currentHex = "4F46E5")
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun SettingsScreenPreview_CustomColor() {
+    TrackAppTheme {
+        SettingsScreenContent(currentHex = "F43F5E")
     }
 }

@@ -19,6 +19,9 @@ local.properties
 # Secrets — never commit these
 app/src/main/java/com/trackapp/data/remote/SupabaseConfig.kt
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

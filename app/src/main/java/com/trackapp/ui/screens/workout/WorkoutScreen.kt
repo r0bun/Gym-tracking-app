@@ -26,9 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.trackapp.data.local.entity.ExerciseEntity
+import com.trackapp.data.local.entity.SetEntity
+import com.trackapp.data.local.entity.WorkoutEntryEntity
 import com.trackapp.ui.theme.Accent
+import com.trackapp.ui.theme.TrackAppTheme
 
 // ── Unit conversion helpers ──────────────────────────────────────────────────
 // Weight is always stored internally in lbs (as a Float).
@@ -63,19 +67,72 @@ fun WorkoutScreen(
     onBack: () -> Unit  // navigate back when the user taps the back arrow
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    // Local state for the rename text field (kept here so it doesn't live in ViewModel).
-    var renameText by remember { mutableStateOf("") }
 
     // Load the workout when this screen first appears (or when workoutId changes).
-    // LaunchedEffect with workoutId as key means it runs once per unique workoutId.
     LaunchedEffect(workoutId) { viewModel.loadWorkout(workoutId) }
+
+    // Auto-clear the error state once the UI has had a chance to display it.
+    uiState.error?.let { LaunchedEffect(it) { viewModel.clearError() } }
+
+    WorkoutScreenContent(
+        uiState = uiState,
+        onBack = onBack,
+        onShowRenameDialog = viewModel::showRenameDialog,
+        onDismissRenameDialog = viewModel::dismissRenameDialog,
+        onUpdateWorkoutName = viewModel::updateWorkoutName,
+        onOpenExercisePicker = viewModel::openExercisePicker,
+        onCloseExercisePicker = viewModel::closeExercisePicker,
+        onExerciseSearchChange = viewModel::setExerciseSearch,
+        onSelectExercise = viewModel::selectExercise,
+        onUpdateDraft = viewModel::updateDraft,
+        onAddSetToDraft = viewModel::addSetToDraft,
+        onRemoveSetFromDraft = viewModel::removeSetFromDraft,
+        onUpdateSetInDraft = viewModel::updateSetInDraft,
+        onSaveDraft = viewModel::saveDraft,
+        onCancelDraft = viewModel::cancelDraft,
+        onEditEntry = viewModel::editEntry,
+        onDeleteEntry = { viewModel.deleteEntry(it.entry) },
+        onRequestLinkSuperset = { viewModel.requestLinkSuperset(it) },
+        onUnlinkSuperset = { viewModel.unlinkSuperset(it.entry) },
+        onLinkSuperset = viewModel::linkSuperset,
+        onDismissSupersetPicker = viewModel::dismissSupersetPicker
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WorkoutScreenContent(
+    uiState: WorkoutUiState,
+    onBack: () -> Unit = {},
+    onShowRenameDialog: () -> Unit = {},
+    onDismissRenameDialog: () -> Unit = {},
+    onUpdateWorkoutName: (String) -> Unit = {},
+    onOpenExercisePicker: () -> Unit = {},
+    onCloseExercisePicker: () -> Unit = {},
+    onExerciseSearchChange: (String) -> Unit = {},
+    onSelectExercise: (ExerciseEntity) -> Unit = {},
+    onUpdateDraft: (EntryDraft) -> Unit = {},
+    onAddSetToDraft: () -> Unit = {},
+    onRemoveSetFromDraft: (Int) -> Unit = {},
+    onUpdateSetInDraft: (Int, SetDraft) -> Unit = { _, _ -> },
+    onSaveDraft: () -> Unit = {},
+    onCancelDraft: () -> Unit = {},
+    onEditEntry: (EntryWithSets) -> Unit = {},
+    onDeleteEntry: (EntryWithSets) -> Unit = {},
+    onRequestLinkSuperset: (String) -> Unit = {},
+    onUnlinkSuperset: (EntryWithSets) -> Unit = {},
+    onLinkSuperset: (String, String) -> Unit = { _, _ -> },
+    onDismissSupersetPicker: () -> Unit = {}
+) {
+    // Local state for the rename text field (kept here so it doesn't live in ViewModel).
+    var renameText by remember { mutableStateOf("") }
 
     // ── Rename workout dialog ────────────────────────────────────────────────
     if (uiState.showRenameDialog) {
         // Pre-fill the text field with the current name (but not "Workout" placeholder).
         LaunchedEffect(Unit) { renameText = uiState.workoutName.let { if (it == "Workout") "" else it } }
         AlertDialog(
-            onDismissRequest = viewModel::dismissRenameDialog,
+            onDismissRequest = onDismissRenameDialog,
             title = { Text("Rename Workout") },
             text = {
                 OutlinedTextField(
@@ -88,59 +145,52 @@ fun WorkoutScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.updateWorkoutName(renameText)
+                    onUpdateWorkoutName(renameText)
                     renameText = ""
                 }) { Text("Save") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissRenameDialog(); renameText = "" }) { Text("Cancel") }
+                TextButton(onClick = { onDismissRenameDialog(); renameText = "" }) { Text("Cancel") }
             }
         )
     }
 
     // ── Exercise picker bottom sheet ─────────────────────────────────────────
-    // A bottom sheet slides up from the bottom of the screen — less intrusive
-    // than a full-screen dialog.
     if (uiState.showExercisePicker) {
-        ModalBottomSheet(onDismissRequest = viewModel::closeExercisePicker) {
+        ModalBottomSheet(onDismissRequest = onCloseExercisePicker) {
             ExercisePickerSheet(
                 exercises = uiState.exercises,
                 searchQuery = uiState.exerciseSearch,
-                onSearchChange = viewModel::setExerciseSearch,
-                onSelect = viewModel::selectExercise
+                onSearchChange = onExerciseSearchChange,
+                onSelect = onSelectExercise
             )
         }
     }
 
     // ── Entry editor dialog ──────────────────────────────────────────────────
-    // Shown when editingDraft is non-null (i.e. user is adding or editing an exercise).
     uiState.editingDraft?.let { draft ->
         EntryEditorDialog(
             draft = draft,
-            isEditing = uiState.editingEntryId != null,  // true = edit mode, false = add mode
+            isEditing = uiState.editingEntryId != null,
             isSaving = uiState.isSaving,
-            onDraftChange = viewModel::updateDraft,
-            onAddSet = viewModel::addSetToDraft,
-            onRemoveSet = viewModel::removeSetFromDraft,
-            onUpdateSet = viewModel::updateSetInDraft,
-            onSave = viewModel::saveDraft,
-            onCancel = viewModel::cancelDraft
+            onDraftChange = onUpdateDraft,
+            onAddSet = onAddSetToDraft,
+            onRemoveSet = onRemoveSetFromDraft,
+            onUpdateSet = onUpdateSetInDraft,
+            onSave = onSaveDraft,
+            onCancel = onCancelDraft
         )
     }
 
     // ── Superset picker dialog ───────────────────────────────────────────────
-    // Shown when the user taps "Superset" on an exercise card.
     uiState.showSupersetPickerForEntryId?.let { sourceId ->
         SupersetPickerDialog(
             sourceEntryId = sourceId,
             allEntries = uiState.entriesWithSets,
-            onLink = { targetId -> viewModel.linkSuperset(sourceId, targetId) },
-            onDismiss = viewModel::dismissSupersetPicker
+            onLink = { targetId -> onLinkSuperset(sourceId, targetId) },
+            onDismiss = onDismissSupersetPicker
         )
     }
-
-    // Auto-clear the error state once the UI has had a chance to display it.
-    uiState.error?.let { LaunchedEffect(it) { viewModel.clearError() } }
 
     // ── Scaffold (main layout) ────────────────────────────────────────────────
     Scaffold(
@@ -150,7 +200,7 @@ fun WorkoutScreen(
                     // The workout title is tappable — clicking opens the rename dialog.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { viewModel.showRenameDialog() }
+                        modifier = Modifier.clickable { onShowRenameDialog() }
                     ) {
                         Text(uiState.workoutName, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false))
@@ -175,7 +225,7 @@ fun WorkoutScreen(
         // FAB (+ button) opens the exercise picker to add a new exercise.
         floatingActionButton = {
             FloatingActionButton(
-                onClick = viewModel::openExercisePicker,
+                onClick = onOpenExercisePicker,
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Exercise")
@@ -207,10 +257,10 @@ fun WorkoutScreen(
                 items(uiState.entriesWithSets, key = { it.entry.id }) { ews ->
                     EntryCard(
                         entryWithSets = ews,
-                        onEdit = { viewModel.editEntry(ews) },
-                        onDelete = { viewModel.deleteEntry(ews.entry) },
-                        onRequestSuperset = { viewModel.requestLinkSuperset(ews.entry.id) },
-                        onUnlinkSuperset = { viewModel.unlinkSuperset(ews.entry) }
+                        onEdit = { onEditEntry(ews) },
+                        onDelete = { onDeleteEntry(ews) },
+                        onRequestSuperset = { onRequestLinkSuperset(ews.entry.id) },
+                        onUnlinkSuperset = { onUnlinkSuperset(ews) }
                     )
                 }
                 // Extra padding at the bottom so the FAB doesn't cover the last card.
@@ -648,5 +698,56 @@ private fun ExercisePickerSheet(
                 }
             }
         }
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun WorkoutScreenPreview_WithExercises() {
+    val sampleEntry1 = WorkoutEntryEntity(
+        id = "e1", workoutId = "w1", exerciseId = "ex1",
+        sets = 3, reps = 10, weightKg = 135f, useLbs = true
+    )
+    val sampleEntry2 = WorkoutEntryEntity(
+        id = "e2", workoutId = "w1", exerciseId = "ex2",
+        sets = 4, reps = 8, weightKg = 185f, useLbs = true
+    )
+    TrackAppTheme {
+        WorkoutScreenContent(
+            uiState = WorkoutUiState(
+                workoutName = "Push Day",
+                entriesWithSets = listOf(
+                    EntryWithSets(
+                        entry = sampleEntry1,
+                        sets = listOf(
+                            SetEntity(id = "s1", entryId = "e1", setNumber = 1, reps = 10, weightLbs = 135f),
+                            SetEntity(id = "s2", entryId = "e1", setNumber = 2, reps = 8, weightLbs = 135f),
+                            SetEntity(id = "s3", entryId = "e1", setNumber = 3, reps = 6, weightLbs = 145f, toFailure = true)
+                        ),
+                        exerciseName = "Bench Press"
+                    ),
+                    EntryWithSets(
+                        entry = sampleEntry2,
+                        sets = listOf(
+                            SetEntity(id = "s4", entryId = "e2", setNumber = 1, reps = 12, weightLbs = 30f),
+                            SetEntity(id = "s5", entryId = "e2", setNumber = 2, reps = 10, weightLbs = 30f)
+                        ),
+                        exerciseName = "Lateral Raise"
+                    )
+                )
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun WorkoutScreenPreview_Empty() {
+    TrackAppTheme {
+        WorkoutScreenContent(
+            uiState = WorkoutUiState(workoutName = "New Workout")
+        )
     }
 }

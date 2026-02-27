@@ -16,42 +16,60 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.trackapp.data.local.entity.WorkoutEntity
 import com.trackapp.ui.theme.Accent
+import com.trackapp.ui.theme.TrackAppTheme
 
-// @OptIn is required to use some experimental APIs that may change in future
-// Compose versions (here: ExperimentalMaterial3Api for TopAppBar).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    viewModel: HistoryViewModel,       // the data/logic brain
-    onOpenWorkout: (String) -> Unit,   // callback: navigate to a workout's detail
-    onBack: () -> Unit                 // callback: go back to Home
+    viewModel: HistoryViewModel,
+    onOpenWorkout: (String) -> Unit,
+    onBack: () -> Unit
 ) {
-    // collectAsState() subscribes to the StateFlow and returns the latest value
-    // as a Compose State — any composable reading uiState re-renders when it changes.
     val uiState by viewModel.uiState.collectAsState()
 
+    HistoryScreenContent(
+        uiState = uiState,
+        formatDate = viewModel::formatDate,
+        onOpenWorkout = onOpenWorkout,
+        onBack = onBack,
+        onConfirmDelete = viewModel::confirmDelete,
+        onCancelDelete = viewModel::cancelDelete,
+        onExecuteDelete = viewModel::executeDelete
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryScreenContent(
+    uiState: HistoryUiState,
+    formatDate: (Long) -> String = { "" },
+    onOpenWorkout: (String) -> Unit = {},
+    onBack: () -> Unit = {},
+    onConfirmDelete: (String) -> Unit = {},
+    onCancelDelete: () -> Unit = {},
+    onExecuteDelete: () -> Unit = {}
+) {
     // ── Delete confirmation dialog ─────────────────────────────────────────────
-    // Only shown when deleteTargetId is non-null (user tapped the delete icon).
     if (uiState.deleteTargetId != null) {
         AlertDialog(
-            onDismissRequest = viewModel::cancelDelete,  // tapped outside → cancel
+            onDismissRequest = onCancelDelete,
             title = { Text("Delete Workout?") },
             text = { Text("This will permanently delete the workout and all its exercises.") },
             confirmButton = {
-                TextButton(onClick = viewModel::executeDelete) {
+                TextButton(onClick = onExecuteDelete) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::cancelDelete) { Text("Cancel") }
+                TextButton(onClick = onCancelDelete) { Text("Cancel") }
             }
         )
     }
 
-    // Scaffold provides the basic Material screen structure:
-    // a top bar, optional FAB, snackbar host, and the main content area.
     Scaffold(
         topBar = {
             TopAppBar(
@@ -152,7 +170,7 @@ fun HistoryScreen(
                                     // Otherwise show the formatted date.
                                     Text(
                                         text = if (workout.notes.isNotBlank()) workout.notes
-                                               else viewModel.formatDate(workout.date),
+                                               else formatDate(workout.date),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
@@ -161,7 +179,7 @@ fun HistoryScreen(
                                     // If there IS a name, show the date as secondary text below.
                                     if (workout.notes.isNotBlank()) {
                                         Text(
-                                            text = viewModel.formatDate(workout.date),
+                                            text = formatDate(workout.date),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -171,7 +189,7 @@ fun HistoryScreen(
                                 }
 
                                 // Trash icon on the right — opens the delete confirmation dialog.
-                                IconButton(onClick = { viewModel.confirmDelete(workout.id) }) {
+                                IconButton(onClick = { onConfirmDelete(workout.id) }) {
                                     Icon(
                                         imageVector = Icons.Filled.Delete,
                                         contentDescription = "Delete",
@@ -184,5 +202,45 @@ fun HistoryScreen(
                 }
             }
         }
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HistoryScreenPreview_WithWorkouts() {
+    TrackAppTheme {
+        HistoryScreenContent(
+            uiState = HistoryUiState(
+                isLoading = false,
+                workouts = listOf(
+                    WorkoutEntity(id = "1", notes = "Push Day", date = 1700000000000),
+                    WorkoutEntity(id = "2", notes = "Pull Day", date = 1699900000000),
+                    WorkoutEntity(id = "3", notes = "", date = 1699800000000)
+                )
+            ),
+            formatDate = { "Mon, Nov 14 2023 \u2022 3:33 PM" }
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HistoryScreenPreview_Empty() {
+    TrackAppTheme {
+        HistoryScreenContent(
+            uiState = HistoryUiState(isLoading = false, workouts = emptyList())
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HistoryScreenPreview_Loading() {
+    TrackAppTheme {
+        HistoryScreenContent(
+            uiState = HistoryUiState(isLoading = true)
+        )
     }
 }

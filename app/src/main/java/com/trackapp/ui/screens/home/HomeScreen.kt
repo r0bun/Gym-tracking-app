@@ -18,8 +18,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.trackapp.data.local.entity.WorkoutEntity
 import com.trackapp.ui.theme.Accent
+import com.trackapp.ui.theme.TrackAppTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,23 +41,46 @@ fun HomeScreen(
     // within a composable (e.g. from a button click handler).
     val scope = rememberCoroutineScope()
 
-    // SnackbarHostState manages the snackbar queue (the toast-like message at
-    // the bottom of the screen after a sync).
+    // Show the sync result as a snackbar whenever the syncMessage changes.
+    // LaunchedEffect re-runs whenever "message" changes.
     val snackbarHostState = remember { SnackbarHostState() }
+    uiState.syncMessage?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearSyncMessage()
+        }
+    }
 
+    HomeScreenContent(
+        uiState = uiState,
+        snackbarHostState = snackbarHostState,
+        formatDate = viewModel::formatDate,
+        onStartWorkout = { name -> viewModel.startNewWorkout(name, onStartWorkout) },
+        onOpenWorkout = onOpenWorkout,
+        onSignOut = { scope.launch { viewModel.signOut(); onSignOut() } },
+        onSyncExercises = viewModel::syncExercises,
+        onOpenHistory = onOpenHistory,
+        onOpenSettings = onOpenSettings
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreenContent(
+    uiState: HomeUiState,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    formatDate: (Long) -> String = { "" },
+    onStartWorkout: (String) -> Unit = {},
+    onOpenWorkout: (String) -> Unit = {},
+    onSignOut: () -> Unit = {},
+    onSyncExercises: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
+) {
     // Local UI state for dialog visibility and the new workout name input.
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
     var pendingWorkoutName by remember { mutableStateOf("") }
-
-    // Show the sync result as a snackbar whenever the syncMessage changes.
-    // LaunchedEffect re-runs whenever "message" changes.
-    uiState.syncMessage?.let { message ->
-        LaunchedEffect(message) {
-            snackbarHostState.showSnackbar(message)
-            viewModel.clearSyncMessage()  // clear so the snackbar doesn't re-show
-        }
-    }
 
     // ── Name dialog — shown when the user taps "Start Workout" ───────────────
     if (showNameDialog) {
@@ -73,8 +99,7 @@ fun HomeScreen(
             confirmButton = {
                 Button(onClick = {
                     showNameDialog = false
-                    // Create the workout in the DB and navigate to it.
-                    viewModel.startNewWorkout(pendingWorkoutName, onStartWorkout)
+                    onStartWorkout(pendingWorkoutName)
                     pendingWorkoutName = ""
                 }) { Text("Start") }
             },
@@ -94,11 +119,7 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         showSignOutDialog = false
-                        // Sign out is a suspend function, so we launch a coroutine.
-                        scope.launch {
-                            viewModel.signOut()
-                            onSignOut()  // navigate back to Login
-                        }
+                        onSignOut()
                     }
                 ) { Text("Sign Out", color = MaterialTheme.colorScheme.error) }
             },
@@ -131,7 +152,7 @@ fun HomeScreen(
                 actions = {
                     // Sync exercises button — shows a spinner while syncing.
                     IconButton(
-                        onClick = { viewModel.syncExercises() },
+                        onClick = onSyncExercises,
                         enabled = !uiState.isSyncingExercises
                     ) {
                         if (uiState.isSyncingExercises) {
@@ -261,7 +282,7 @@ fun HomeScreen(
                                     // Show name if set, otherwise fall back to the date.
                                     Text(
                                         text = if (workout.notes.isNotBlank()) workout.notes
-                                               else viewModel.formatDate(workout.date),
+                                               else formatDate(workout.date),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
@@ -270,7 +291,7 @@ fun HomeScreen(
                                     // If named, show the date as secondary info.
                                     if (workout.notes.isNotBlank()) {
                                         Text(
-                                            text = viewModel.formatDate(workout.date),
+                                            text = formatDate(workout.date),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -310,5 +331,50 @@ fun HomeScreen(
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HomeScreenPreview_WithWorkouts() {
+    TrackAppTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(
+                isLoading = false,
+                userEmail = "user@example.com",
+                recentWorkouts = listOf(
+                    WorkoutEntity(id = "1", notes = "Push Day", date = 1700000000000),
+                    WorkoutEntity(id = "2", notes = "Pull Day", date = 1699900000000),
+                    WorkoutEntity(id = "3", notes = "Leg Day", date = 1699800000000)
+                )
+            ),
+            formatDate = { "Mon, Nov 14 \u2022 3:33 PM" }
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HomeScreenPreview_Empty() {
+    TrackAppTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(
+                isLoading = false,
+                userEmail = "user@example.com",
+                recentWorkouts = emptyList()
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0F0F11)
+@Composable
+internal fun HomeScreenPreview_Loading() {
+    TrackAppTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(isLoading = true, userEmail = "user@example.com")
+        )
     }
 }
