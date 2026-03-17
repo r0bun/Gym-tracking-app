@@ -70,7 +70,9 @@ data class WorkoutUiState(
     val isSaving: Boolean = false,                         // true while DB write is happening
     val error: String? = null,                             // validation error message
     val showSupersetPickerForEntryId: String? = null,      // non-null = superset picker open
-    val showRenameDialog: Boolean = false                  // whether the rename dialog is open
+    val showRenameDialog: Boolean = false,                 // whether the rename dialog is open
+    val showCreateCustomExerciseDialog: Boolean = false,   // create-custom-exercise dialog
+    val renamingExercise: ExerciseEntity? = null           // non-null = rename exercise dialog open
 )
 
 class WorkoutViewModel(
@@ -337,6 +339,60 @@ class WorkoutViewModel(
     // Removes the superset link from an entry by setting its groupId to null.
     fun unlinkSuperset(entry: WorkoutEntryEntity) {
         viewModelScope.launch { workoutRepository.updateEntry(entry.copy(supersetGroupId = null)) }
+    }
+
+    // ── Custom exercises ───────────────────────────────────────────────────────
+
+    // Opens the dialog for creating a new custom exercise.
+    fun openCreateCustomExerciseDialog() {
+        _uiState.value = _uiState.value.copy(showCreateCustomExerciseDialog = true)
+    }
+
+    // Closes the create-custom-exercise dialog without saving.
+    fun dismissCreateCustomExerciseDialog() {
+        _uiState.value = _uiState.value.copy(showCreateCustomExerciseDialog = false)
+    }
+
+    // Creates a custom exercise and immediately opens the entry editor for it.
+    fun createCustomExercise(name: String, muscleGroup: String) {
+        viewModelScope.launch {
+            val exercise = exerciseRepository.createCustomExercise(name, muscleGroup)
+            exerciseNameCache[exercise.id] = exercise.name
+            // Pre-fill with one blank set (no history for a brand-new exercise).
+            _uiState.value = _uiState.value.copy(
+                showCreateCustomExerciseDialog = false,
+                showExercisePicker = false,
+                editingDraft = EntryDraft(
+                    exerciseId = exercise.id,
+                    exerciseName = exercise.name,
+                    sets = listOf(SetDraft()),
+                    useLbs = preferencesRepository.useLbs.value
+                ),
+                editingEntryId = null
+            )
+        }
+    }
+
+    // Opens the rename dialog for a custom exercise.
+    fun openRenameExerciseDialog(exercise: ExerciseEntity) {
+        _uiState.value = _uiState.value.copy(renamingExercise = exercise)
+    }
+
+    // Closes the rename dialog without saving.
+    fun dismissRenameExerciseDialog() {
+        _uiState.value = _uiState.value.copy(renamingExercise = null)
+    }
+
+    // Saves the new name for a custom exercise and refreshes the picker list.
+    fun renameExercise(exercise: ExerciseEntity, newName: String) {
+        viewModelScope.launch {
+            exerciseRepository.renameExercise(exercise, newName)
+            // Update the cache so the cards reflect the new name immediately.
+            exerciseNameCache[exercise.id] = newName.trim()
+            _uiState.value = _uiState.value.copy(renamingExercise = null)
+            // Re-trigger the current search so the list refreshes with the new name.
+            setExerciseSearch(_uiState.value.exerciseSearch)
+        }
     }
 
     // ── Rename workout ─────────────────────────────────────────────────────────

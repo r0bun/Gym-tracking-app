@@ -44,6 +44,18 @@ interface ExerciseDao {
     @Upsert
     suspend fun upsertAll(exercises: List<ExerciseEntity>)
 
+    // Inserts a single exercise (used when creating a custom exercise locally).
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(exercise: ExerciseEntity)
+
+    // Updates an existing exercise row (used to rename a custom exercise).
+    @Update
+    suspend fun update(exercise: ExerciseEntity)
+
+    // Deletes a single exercise by ID (used to delete a custom exercise).
+    @Query("DELETE FROM exercises WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     // Deletes every row from the exercises table. Used before a full re-sync.
     @Query("DELETE FROM exercises")
     suspend fun clearAll()

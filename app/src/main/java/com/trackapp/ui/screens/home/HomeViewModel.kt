@@ -19,6 +19,7 @@ import java.util.*
 // Everything the Home screen needs to display, in one object.
 data class HomeUiState(
     val recentWorkouts: List<WorkoutEntity> = emptyList(), // the 5 most recent sessions
+    val allWorkouts: List<WorkoutEntity> = emptyList(),    // all workouts — used in the template picker
     val isLoading: Boolean = true,                         // show spinner on first load
     val userEmail: String = "",                            // displayed in the top bar
     val isSyncingExercises: Boolean = false,               // true while syncing — disables button
@@ -42,12 +43,12 @@ class HomeViewModel(
 
         viewModelScope.launch {
             workoutRepository.getAllWorkouts()
-                // Take only the 5 most recent workouts for the home screen preview.
-                // The full list is available on the History screen.
-                .map { it.take(5) }
                 .collect { workouts ->
                     _uiState.value = _uiState.value.copy(
-                        recentWorkouts = workouts,
+                        // Show only the 5 most recent on the home screen card list.
+                        recentWorkouts = workouts.take(5),
+                        // Expose the full list so the template picker can show all workouts.
+                        allWorkouts = workouts,
                         isLoading = false
                     )
                 }
@@ -56,9 +57,13 @@ class HomeViewModel(
 
     // Creates a new workout in the database and passes its ID to the callback
     // so AppNavigation can open the Workout screen for it.
-    fun startNewWorkout(name: String, onCreated: (String) -> Unit) {
+    // If templateId is provided, the exercises from that workout are copied in.
+    fun startNewWorkout(name: String, templateId: String? = null, onCreated: (String) -> Unit) {
         viewModelScope.launch {
             val workout = workoutRepository.createWorkout(name)
+            if (templateId != null) {
+                workoutRepository.copyEntriesFromWorkout(templateId, workout.id)
+            }
             onCreated(workout.id)
         }
     }

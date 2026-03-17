@@ -15,6 +15,7 @@ import com.trackapp.data.remote.RemoteExercise
 import com.trackapp.data.remote.SupabaseConfig
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
 class ExerciseRepository(private val exerciseDao: ExerciseDao) {
 
@@ -34,6 +35,29 @@ class ExerciseRepository(private val exerciseDao: ExerciseDao) {
 
     // Looks up a single exercise by its ID. Returns null if not found.
     suspend fun getExerciseById(id: String): ExerciseEntity? = exerciseDao.getById(id)
+
+    // Creates a new exercise locally (not synced to Supabase).
+    // Returns the created entity so the caller can use it immediately.
+    suspend fun createCustomExercise(name: String, muscleGroup: String): ExerciseEntity {
+        val exercise = ExerciseEntity(
+            id = UUID.randomUUID().toString(),
+            name = name.trim(),
+            muscleGroup = muscleGroup.trim(),
+            isCustom = true
+        )
+        exerciseDao.insert(exercise)
+        return exercise
+    }
+
+    // Renames a custom exercise. Only call this for exercises with isCustom = true.
+    suspend fun renameExercise(exercise: ExerciseEntity, newName: String) {
+        exerciseDao.update(exercise.copy(name = newName.trim()))
+    }
+
+    // Deletes a custom exercise by ID.
+    suspend fun deleteCustomExercise(id: String) {
+        exerciseDao.deleteById(id)
+    }
 
     // Downloads the full exercise list from Supabase and saves it locally.
     // Called once on login and whenever the user taps the sync button.

@@ -26,6 +26,12 @@ interface WorkoutEntryDao {
     @Query("SELECT * FROM workout_entries WHERE workoutId = :workoutId ORDER BY rowid ASC")
     fun getEntriesWithSets(workoutId: String): Flow<List<EntryWithSetsRelation>>
 
+    // One-shot suspend version of getEntriesWithSets.
+    // Used when copying a template workout's exercises into a new workout.
+    @Transaction
+    @Query("SELECT * FROM workout_entries WHERE workoutId = :workoutId ORDER BY rowid ASC")
+    suspend fun getEntriesWithSetsOnce(workoutId: String): List<EntryWithSetsRelation>
+
     // Looks up the most recent entry for a specific exercise across all workouts.
     // Used to auto-fill weight/reps when the user picks an exercise they've
     // done before — so they don't have to type the same numbers every time.

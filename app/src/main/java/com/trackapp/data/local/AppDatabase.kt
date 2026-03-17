@@ -34,7 +34,7 @@ import com.trackapp.data.local.entity.WorkoutEntryEntity
         WorkoutEntryEntity::class,
         SetEntity::class
     ],
-    version = 3,      // bump this number every time the schema changes
+    version = 4,      // bump this number every time the schema changes
     exportSchema = false
 )
 // RoomDatabase is the base class Room requires us to extend.
@@ -62,6 +62,17 @@ abstract class AppDatabase : RoomDatabase() {
         // schema changes (a new column is added, a table is created, etc.),
         // we need a "migration" — a script that upgrades the existing database
         // from the old version to the new one WITHOUT deleting the user's data.
+
+        // Migration from version 3 → 4:
+        // Adds an "isCustom" column to exercises so the app can distinguish
+        // user-created exercises (renameable/deleteable) from Supabase ones.
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE exercises ADD COLUMN isCustom INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
 
         // Migration from version 2 → 3:
         // Adds a "useLbs" column to workout_entries so each exercise can
@@ -119,7 +130,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "trackapp_database"          // the filename on disk
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // apply schema upgrades
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4) // apply schema upgrades
                     // Fallback: if no migration covers the version gap, wipe and
                     // recreate the database. This loses data but prevents crashes.
                     .fallbackToDestructiveMigration()

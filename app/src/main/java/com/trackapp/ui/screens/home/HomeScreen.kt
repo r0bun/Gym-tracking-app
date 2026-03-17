@@ -7,6 +7,7 @@
 
 package com.trackapp.ui.screens.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,7 +56,7 @@ fun HomeScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
         formatDate = viewModel::formatDate,
-        onStartWorkout = { name -> viewModel.startNewWorkout(name, onStartWorkout) },
+        onStartWorkout = { name, templateId -> viewModel.startNewWorkout(name, templateId, onStartWorkout) },
         onOpenWorkout = onOpenWorkout,
         onSignOut = { scope.launch { viewModel.signOut(); onSignOut() } },
         onSyncExercises = viewModel::syncExercises,
@@ -70,7 +71,7 @@ fun HomeScreenContent(
     uiState: HomeUiState,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     formatDate: (Long) -> String = { "" },
-    onStartWorkout: (String) -> Unit = {},
+    onStartWorkout: (name: String, templateId: String?) -> Unit = { _, _ -> },
     onOpenWorkout: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     onSyncExercises: () -> Unit = {},
@@ -81,30 +82,146 @@ fun HomeScreenContent(
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
     var pendingWorkoutName by remember { mutableStateOf("") }
+    // The workout selected as a template (null = start blank).
+    var selectedTemplate by remember { mutableStateOf<WorkoutEntity?>(null) }
+    // Whether the "pick template" section in the dialog is expanded.
+    var showTemplatePicker by remember { mutableStateOf(false) }
 
-    // ── Name dialog — shown when the user taps "Start Workout" ───────────────
+    // ── Start Workout dialog — shown when the user taps "Start Workout" ───────
     if (showNameDialog) {
         AlertDialog(
-            onDismissRequest = { showNameDialog = false; pendingWorkoutName = "" },
-            title = { Text("Name your session") },
+            onDismissRequest = {
+                showNameDialog = false
+                pendingWorkoutName = ""
+                selectedTemplate = null
+                showTemplatePicker = false
+            },
+            title = { Text("New session") },
             text = {
-                OutlinedTextField(
-                    value = pendingWorkoutName,
-                    onValueChange = { pendingWorkoutName = it },
-                    placeholder = { Text("e.g. Push Day, Leg Day…") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Session name field
+                    OutlinedTextField(
+                        value = pendingWorkoutName,
+                        onValueChange = { pendingWorkoutName = it },
+                        placeholder = { Text("e.g. Push Day, Leg Day…") },
+                        label = { Text("Session name (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // ── Template picker section ────────────────────────────────
+                    HorizontalDivider()
+                    // Header row — tapping toggles the picker.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTemplatePicker = !showTemplatePicker },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Start from previous workout",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (selectedTemplate != null) {
+                                Text(
+                                    text = selectedTemplate!!.notes.ifBlank { formatDate(selectedTemplate!!.date) },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Accent,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            } else {
+                                Text(
+                                    text = "Optional",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        // Chevron flips direction based on expanded state.
+                        Icon(
+                            imageVector = if (showTemplatePicker) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Expanded: list of past workouts to pick from.
+                    if (showTemplatePicker && uiState.allWorkouts.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // "None / start blank" option
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedTemplate = null },
+                                border = if (selectedTemplate == null)
+                                    BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                                else
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            ) {
+                                Text(
+                                    text = "Start blank",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    color = if (selectedTemplate == null)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            uiState.allWorkouts.forEach { workout ->
+                                OutlinedCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedTemplate = workout },
+                                    border = if (selectedTemplate?.id == workout.id)
+                                        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                                    else
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                        Text(
+                                            text = workout.notes.ifBlank { formatDate(workout.date) },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (selectedTemplate?.id == workout.id)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (workout.notes.isNotBlank()) {
+                                            Text(
+                                                text = formatDate(workout.date),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
                 Button(onClick = {
                     showNameDialog = false
-                    onStartWorkout(pendingWorkoutName)
+                    onStartWorkout(pendingWorkoutName, selectedTemplate?.id)
                     pendingWorkoutName = ""
+                    selectedTemplate = null
+                    showTemplatePicker = false
                 }) { Text("Start") }
             },
             dismissButton = {
-                TextButton(onClick = { showNameDialog = false; pendingWorkoutName = "" }) { Text("Cancel") }
+                TextButton(onClick = {
+                    showNameDialog = false
+                    pendingWorkoutName = ""
+                    selectedTemplate = null
+                    showTemplatePicker = false
+                }) { Text("Cancel") }
             }
         )
     }

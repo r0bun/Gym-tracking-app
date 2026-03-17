@@ -95,7 +95,13 @@ fun WorkoutScreen(
         onRequestLinkSuperset = { viewModel.requestLinkSuperset(it) },
         onUnlinkSuperset = { viewModel.unlinkSuperset(it.entry) },
         onLinkSuperset = viewModel::linkSuperset,
-        onDismissSupersetPicker = viewModel::dismissSupersetPicker
+        onDismissSupersetPicker = viewModel::dismissSupersetPicker,
+        onOpenCreateCustomExercise = viewModel::openCreateCustomExerciseDialog,
+        onDismissCreateCustomExercise = viewModel::dismissCreateCustomExerciseDialog,
+        onCreateCustomExercise = viewModel::createCustomExercise,
+        onRenameExercise = viewModel::openRenameExerciseDialog,
+        onDismissRenameExercise = viewModel::dismissRenameExerciseDialog,
+        onConfirmRenameExercise = viewModel::renameExercise
     )
 }
 
@@ -122,10 +128,89 @@ fun WorkoutScreenContent(
     onRequestLinkSuperset: (String) -> Unit = {},
     onUnlinkSuperset: (EntryWithSets) -> Unit = {},
     onLinkSuperset: (String, String) -> Unit = { _, _ -> },
-    onDismissSupersetPicker: () -> Unit = {}
+    onDismissSupersetPicker: () -> Unit = {},
+    onOpenCreateCustomExercise: () -> Unit = {},
+    onDismissCreateCustomExercise: () -> Unit = {},
+    onCreateCustomExercise: (name: String, muscleGroup: String) -> Unit = { _, _ -> },
+    onRenameExercise: (ExerciseEntity) -> Unit = {},
+    onDismissRenameExercise: () -> Unit = {},
+    onConfirmRenameExercise: (ExerciseEntity, String) -> Unit = { _, _ -> }
 ) {
-    // Local state for the rename text field (kept here so it doesn't live in ViewModel).
+    // Local state for the rename workout text field (kept here so it doesn't live in ViewModel).
     var renameText by remember { mutableStateOf("") }
+
+    // ── Create custom exercise dialog ────────────────────────────────────────
+    if (uiState.showCreateCustomExerciseDialog) {
+        var customName by remember { mutableStateOf("") }
+        var customMuscleGroup by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { onDismissCreateCustomExercise(); customName = ""; customMuscleGroup = "" },
+            title = { Text("Create custom exercise") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { customName = it },
+                        label = { Text("Exercise name") },
+                        placeholder = { Text("e.g. Hack Squat, Sissy Squat…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customMuscleGroup,
+                        onValueChange = { customMuscleGroup = it },
+                        label = { Text("Muscle group") },
+                        placeholder = { Text("e.g. Legs, Chest, Back…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customName.isNotBlank() && customMuscleGroup.isNotBlank()) {
+                            onCreateCustomExercise(customName, customMuscleGroup)
+                            customName = ""; customMuscleGroup = ""
+                        }
+                    },
+                    enabled = customName.isNotBlank() && customMuscleGroup.isNotBlank()
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { onDismissCreateCustomExercise(); customName = ""; customMuscleGroup = "" }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ── Rename exercise dialog ───────────────────────────────────────────────
+    uiState.renamingExercise?.let { exercise ->
+        var newExerciseName by remember(exercise.id) { mutableStateOf(exercise.name) }
+        AlertDialog(
+            onDismissRequest = onDismissRenameExercise,
+            title = { Text("Rename exercise") },
+            text = {
+                OutlinedTextField(
+                    value = newExerciseName,
+                    onValueChange = { newExerciseName = it },
+                    label = { Text("Exercise name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onConfirmRenameExercise(exercise, newExerciseName) },
+                    enabled = newExerciseName.isNotBlank() && newExerciseName != exercise.name
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissRenameExercise) { Text("Cancel") }
+            }
+        )
+    }
 
     // ── Rename workout dialog ────────────────────────────────────────────────
     if (uiState.showRenameDialog) {
@@ -162,7 +247,9 @@ fun WorkoutScreenContent(
                 exercises = uiState.exercises,
                 searchQuery = uiState.exerciseSearch,
                 onSearchChange = onExerciseSearchChange,
-                onSelect = onSelectExercise
+                onSelect = onSelectExercise,
+                onCreateCustomExercise = onOpenCreateCustomExercise,
+                onRenameExercise = onRenameExercise
             )
         }
     }
@@ -653,7 +740,8 @@ private fun SupersetPickerDialog(
 
 // ── ExercisePickerSheet ──────────────────────────────────────────────────────
 // The bottom sheet that appears when the user taps "+" to add an exercise.
-// Shows a search bar and a scrollable list of all available exercises.
+// Shows a search bar, a scrollable list of exercises, and a button to
+// create a custom exercise that isn't in the Supabase database.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -661,11 +749,33 @@ private fun ExercisePickerSheet(
     exercises: List<ExerciseEntity>,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
-    onSelect: (ExerciseEntity) -> Unit
+    onSelect: (ExerciseEntity) -> Unit,
+    onCreateCustomExercise: () -> Unit = {},
+    onRenameExercise: (ExerciseEntity) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Pick an Exercise", style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        // Header row: title + "Create custom" button.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Pick an Exercise",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
+            )
+            // "+" button to open the create-custom-exercise dialog.
+            OutlinedButton(
+                onClick = onCreateCustomExercise,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Custom", style = MaterialTheme.typography.labelMedium)
+            }
+        }
 
         // Search field — filters by exercise name or muscle group.
         OutlinedTextField(
@@ -681,10 +791,41 @@ private fun ExercisePickerSheet(
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
             items(exercises, key = { it.id }) { exercise ->
                 ListItem(
-                    headlineContent = { Text(exercise.name) },
-                    // Muscle group shown in the primary color below the name.
+                    headlineContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(exercise.name, modifier = Modifier.weight(1f, fill = false))
+                            // Small "Custom" chip for user-created exercises.
+                            if (exercise.isCustom) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "Custom",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                    },
                     supportingContent = { Text(exercise.muscleGroup, color = MaterialTheme.colorScheme.primary) },
                     leadingContent = { Icon(Icons.Filled.FitnessCenter, null, tint = Accent) },
+                    // Show a rename icon for custom exercises.
+                    trailingContent = if (exercise.isCustom) {
+                        {
+                            IconButton(onClick = { onRenameExercise(exercise) }) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = "Rename",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else null,
                     modifier = Modifier.clickable { onSelect(exercise) }
                 )
                 HorizontalDivider()

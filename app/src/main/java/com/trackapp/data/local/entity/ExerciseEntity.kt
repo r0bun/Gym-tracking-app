@@ -23,7 +23,11 @@ data class ExerciseEntity(
     val name: String,
 
     // Which muscle group this exercise targets (e.g. "Chest", "Legs").
-    val muscleGroup: String
+    val muscleGroup: String,
+
+    // True for exercises created locally by the user (not synced from Supabase).
+    // Custom exercises can be renamed and deleted; Supabase exercises cannot.
+    val isCustom: Boolean = false
 )
 // Note: exercises are downloaded from Supabase (the cloud database) when the
 // user logs in, then stored here locally so the app works offline.

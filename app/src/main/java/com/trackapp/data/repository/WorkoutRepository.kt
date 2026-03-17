@@ -17,6 +17,7 @@ import com.trackapp.data.local.entity.SetEntity
 import com.trackapp.data.local.entity.WorkoutEntity
 import com.trackapp.data.local.entity.WorkoutEntryEntity
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
 // The DAOs are injected (passed in) rather than created here, which makes
 // the repository easier to test in isolation.
@@ -54,6 +55,28 @@ class WorkoutRepository(
     // (cascade deletion is handled by the database foreign key rules).
     suspend fun deleteWorkout(workoutId: String) {
         workoutDao.deleteById(workoutId)
+    }
+
+    // Copies all exercise entries (and their sets) from one workout into another.
+    // Used to start a new workout from a previous one as a template.
+    // Superset links are intentionally dropped — the user can re-link if needed.
+    suspend fun copyEntriesFromWorkout(sourceWorkoutId: String, destWorkoutId: String) {
+        val sourceEntries = workoutEntryDao.getEntriesWithSetsOnce(sourceWorkoutId)
+        for (rel in sourceEntries) {
+            val newEntry = rel.entry.copy(
+                id = UUID.randomUUID().toString(),
+                workoutId = destWorkoutId,
+                supersetGroupId = null  // don't carry over superset links
+            )
+            workoutEntryDao.insert(newEntry)
+            val newSets = rel.sets.map { set ->
+                set.copy(
+                    id = UUID.randomUUID().toString(),
+                    entryId = newEntry.id
+                )
+            }
+            setDao.insertAll(newSets)
+        }
     }
 
     // ── Workout Entries ───────────────────────────────────────────────────
