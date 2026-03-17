@@ -9,6 +9,9 @@ A native Android workout tracking app built with **Kotlin + Jetpack Compose**, *
 - **Per-set logging** — each exercise entry has individual sets with reps, weight, and optional to-failure flag
 - **kg / lbs toggle** — per-exercise unit preference, remembered across sessions
 - **Superset linking** — link two exercises together with a shared superset label
+- **Custom exercises** — create your own exercises locally; shown with a "Custom" chip in the picker
+- **Rename custom exercises** — tap the pencil icon to rename any exercise you created
+- **Workout templates** — start a new workout from a previous session to pre-load all exercises and sets
 - **Exercise search** — search and filter cloud-synced exercise list by muscle group
 - **Workout rename** — tap the title to rename any workout session
 - **History** — browse and delete past workouts with confirmation dialog
@@ -43,7 +46,9 @@ Launch → Loading screen (resolves persisted Supabase session)
            ↓
        Sync exercises from Supabase → cached in Room SQLite
            ↓
-       Home Screen → Start Workout (named session, stored locally)
+       Home Screen → Start Workout (named session, or start from a previous workout)
+                      ↓
+                  Stored locally
            ↓
        Workout Screen → Pick exercises → log per-set reps/weight/to-failure
                         kg ↔ lbs toggle per exercise
@@ -57,11 +62,12 @@ Launch → Loading screen (resolves persisted Supabase session)
 
 ---
 
-## Database Schema (Local Room — v3)
+## Database Schema (Local Room — v4)
 
 ```
-exercises       : id | name | muscle_group
+exercises       : id | name | muscle_group | is_custom
                   ← synced from Supabase on login, cached locally
+                  ← custom exercises stored locally only (is_custom = 1)
 
 workouts        : id | date | notes
                   ← stored locally only
@@ -81,7 +87,7 @@ sets            : id | entry_id | set_number | reps | weight_kg | to_failure
 app/src/main/java/com/trackapp/
 ├── data/
 │   ├── local/
-│   │   ├── AppDatabase.kt            ← Room DB, version 3
+│   │   ├── AppDatabase.kt            ← Room DB, version 4
 │   │   ├── dao/                      ← ExerciseDao, WorkoutDao, WorkoutEntryDao, SetDao
 │   │   └── entity/                   ← ExerciseEntity, WorkoutEntity, WorkoutEntryEntity,
 │   │                                    SetEntity, EntryWithSetsRelation
