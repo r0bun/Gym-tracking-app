@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.ktor.client.android)
 
+    // Drag-to-reorder for Compose LazyColumn
+    implementation(libs.reorderable)
+
     // Coroutines & Serialization
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)

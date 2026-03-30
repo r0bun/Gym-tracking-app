@@ -12,6 +12,7 @@ supabase = "3.0.2"
 ktor = "3.0.1"
 kotlinxCoroutines = "1.9.0"
 kotlinxSerialization = "1.7.3"
+reorderable = "2.4.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,9 @@ supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgre
 
 # Ktor engine for Supabase
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
+
+# Drag-to-reorder for Compose LazyColumn
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }

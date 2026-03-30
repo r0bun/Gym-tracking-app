@@ -419,6 +419,25 @@ class WorkoutViewModel(
         }
     }
 
+    // ── Reordering ─────────────────────────────────────────────────────────────
+
+    // Called when the user drops an exercise card at a new position.
+    // Updates the in-memory list immediately (so the UI feels instant) and
+    // then persists the new positions to the database in the background.
+    fun reorderEntries(from: Int, to: Int) {
+        val current = _uiState.value.entriesWithSets.toMutableList()
+        val moved = current.removeAt(from)
+        current.add(to, moved)
+        // Reassign sequential position values based on the new order.
+        val reordered = current.mapIndexed { index, ews ->
+            ews.copy(entry = ews.entry.copy(position = index))
+        }
+        _uiState.value = _uiState.value.copy(entriesWithSets = reordered)
+        viewModelScope.launch {
+            workoutRepository.reorderEntries(reordered.map { it.entry })
+        }
+    }
+
     // Clears the error message (called after the error has been displayed).
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)

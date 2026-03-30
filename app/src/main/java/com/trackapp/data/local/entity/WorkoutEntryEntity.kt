@@ -65,5 +65,9 @@ data class WorkoutEntryEntity(
 
     // Whether the user chose to log weight in lbs (true) or kg (false)
     // for this specific exercise entry.
-    val useLbs: Boolean = true
+    val useLbs: Boolean = true,
+
+    // Display order within the workout. Lower values appear first.
+    // Defaults to 0; new entries are appended by assigning the current count.
+    val position: Int = 0
 )

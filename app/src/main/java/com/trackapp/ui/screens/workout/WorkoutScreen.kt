@@ -14,7 +14,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -101,7 +104,8 @@ fun WorkoutScreen(
         onCreateCustomExercise = viewModel::createCustomExercise,
         onRenameExercise = viewModel::openRenameExerciseDialog,
         onDismissRenameExercise = viewModel::dismissRenameExerciseDialog,
-        onConfirmRenameExercise = viewModel::renameExercise
+        onConfirmRenameExercise = viewModel::renameExercise,
+        onReorderEntries = viewModel::reorderEntries
     )
 }
 
@@ -134,7 +138,8 @@ fun WorkoutScreenContent(
     onCreateCustomExercise: (name: String, muscleGroup: String) -> Unit = { _, _ -> },
     onRenameExercise: (ExerciseEntity) -> Unit = {},
     onDismissRenameExercise: () -> Unit = {},
-    onConfirmRenameExercise: (ExerciseEntity, String) -> Unit = { _, _ -> }
+    onConfirmRenameExercise: (ExerciseEntity, String) -> Unit = { _, _ -> },
+    onReorderEntries: (from: Int, to: Int) -> Unit = { _, _ -> }
 ) {
     // Local state for the rename workout text field (kept here so it doesn't live in ViewModel).
     var renameText by remember { mutableStateOf("") }
@@ -334,21 +339,30 @@ fun WorkoutScreenContent(
                 }
             }
         } else {
-            // ── Exercise card list ────────────────────────────────────────────
+            // ── Exercise card list (drag-to-reorder) ─────────────────────────
+            val listState = rememberLazyListState()
+            val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+                onReorderEntries(from.index, to.index)
+            }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 // One EntryCard per exercise logged in this workout.
                 items(uiState.entriesWithSets, key = { it.entry.id }) { ews ->
-                    EntryCard(
-                        entryWithSets = ews,
-                        onEdit = { onEditEntry(ews) },
-                        onDelete = { onDeleteEntry(ews) },
-                        onRequestSuperset = { onRequestLinkSuperset(ews.entry.id) },
-                        onUnlinkSuperset = { onUnlinkSuperset(ews) }
-                    )
+                    ReorderableItem(reorderState, key = ews.entry.id) { isDragging ->
+                        EntryCard(
+                            entryWithSets = ews,
+                            onEdit = { onEditEntry(ews) },
+                            onDelete = { onDeleteEntry(ews) },
+                            onRequestSuperset = { onRequestLinkSuperset(ews.entry.id) },
+                            onUnlinkSuperset = { onUnlinkSuperset(ews) },
+                            dragHandleModifier = Modifier.draggableHandle(),
+                            isDragging = isDragging
+                        )
+                    }
                 }
                 // Extra padding at the bottom so the FAB doesn't cover the last card.
                 item { Spacer(Modifier.height(80.dp)) }
@@ -367,7 +381,11 @@ private fun EntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRequestSuperset: () -> Unit,
-    onUnlinkSuperset: () -> Unit
+    onUnlinkSuperset: () -> Unit,
+    // Modifier applied to the drag handle icon — supplied by the reorderable
+    // item scope so the library can intercept touch events for dragging.
+    dragHandleModifier: Modifier = Modifier,
+    isDragging: Boolean = false
 ) {
     // Local state: whether to show the delete confirmation for this card.
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -393,12 +411,22 @@ private fun EntryCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 8.dp else 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // ── Header row: exercise name + edit/delete buttons ───────────────
+            // ── Header row: drag handle + exercise name + edit/delete buttons ──
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Drag handle — long-press (or touch) here to reorder the card.
+                Icon(
+                    imageVector = Icons.Filled.DragHandle,
+                    contentDescription = "Drag to reorder",
+                    modifier = dragHandleModifier
+                        .size(24.dp)
+                        .padding(end = 8.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = entryWithSets.exerciseName,

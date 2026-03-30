@@ -67,6 +67,7 @@ class WorkoutRepository(
                 id = UUID.randomUUID().toString(),
                 workoutId = destWorkoutId,
                 supersetGroupId = null  // don't carry over superset links
+                // position is preserved from the source entry, maintaining order
             )
             workoutEntryDao.insert(newEntry)
             val newSets = rel.sets.map { set ->
@@ -91,7 +92,17 @@ class WorkoutRepository(
         workoutEntryDao.getEntriesWithSets(workoutId)
 
     // Saves a new exercise entry to a workout.
-    suspend fun addEntry(entry: WorkoutEntryEntity) = workoutEntryDao.insert(entry)
+    // Automatically assigns a position equal to the current entry count so the
+    // new exercise is appended at the bottom of the list.
+    suspend fun addEntry(entry: WorkoutEntryEntity) {
+        val position = workoutEntryDao.getCountForWorkout(entry.workoutId)
+        workoutEntryDao.insert(entry.copy(position = position))
+    }
+
+    // Persists a new ordering after the user drags exercises around.
+    // Each entry's position field reflects its new index in the list.
+    suspend fun reorderEntries(entries: List<WorkoutEntryEntity>) =
+        workoutEntryDao.updateAll(entries)
 
     // Updates an existing exercise entry (e.g. after editing sets/notes).
     suspend fun updateEntry(entry: WorkoutEntryEntity) = workoutEntryDao.update(entry)
